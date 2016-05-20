@@ -49,7 +49,7 @@ REST_API_VERSION_HISTORY = """
     * 2.1  - Share create() doesn't ignore availability_zone field of share.
     * 2.2  - Snapshots become optional feature.
     * 2.3  - Share instances admin API
-    * 2.4  - Consistency Group support
+    * 2.4  - Consistency Group support (Removed)
     * 2.5  - Share Migration admin API
     * 2.6  - Return share_type UUID instead of name in Share API
     * 2.7  - Rename old extension-like API URLs to core-API-like
@@ -72,14 +72,14 @@ REST_API_VERSION_HISTORY = """
     * 2.19 - Share snapshot instances admin APIs
             (list/show/detail/reset-status).
     * 2.20 - Add MTU to the JSON response of share network show API.
-
+    * 2.21 - Convert Consistency groups to share groups.
 """
 
 # The minimum and maximum versions of the API supported
 # The default api version request is defined to be the
 # the minimum version of the API supported.
 _MIN_API_VERSION = "2.0"
-_MAX_API_VERSION = "2.20"
+_MAX_API_VERSION = "2.21"
 DEFAULT_API_VERSION = _MIN_API_VERSION
 
 
@@ -119,8 +119,11 @@ class APIVersionRequest(utils.ComparableMixin):
 
     def __str__(self):
         """Debug/Logging representation of object."""
-        return ("API Version Request Major: %(major)s, Minor: %(minor)s"
-                % {'major': self._ver_major, 'minor': self._ver_minor})
+        params = {'major': self._ver_major,
+                  'minor': self._ver_minor,
+                  'experimental': self._experimental}
+        return ("API Version Request Major: %(major)s, Minor: %(minor)s, "
+                "Experimental: %(experimental)s" % params)
 
     def is_null(self):
         return self._ver_major is None and self._ver_minor is None

@@ -278,7 +278,7 @@ def fake_replica_request_spec(as_primitive=True, **kwargs):
         'share_id': 'f0e4bb5e-65f0-11e5-9d70-feff819cdc9f',
         'snapshot_id': None,
         'share_type': 'fake_share_type',
-        'consistency_group': None,
+        'share_group': None,
         'active_replica_host': 'fake_active_replica_host',
         'all_replica_hosts': all_replica_hosts,
     }

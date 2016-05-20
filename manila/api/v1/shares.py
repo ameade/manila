@@ -74,19 +74,19 @@ class ShareMixin(object):
         try:
             share = self.share_api.get(context, id)
 
-            # NOTE(ameade): If the share is in a consistency group, we require
-            # it's id be specified as a param.
-            if share.get('consistency_group_id'):
-                consistency_group_id = req.params.get('consistency_group_id')
-                if (share.get('consistency_group_id') and
-                        not consistency_group_id):
-                    msg = _("Must provide 'consistency_group_id' as a request "
-                            "parameter when deleting a share in a consistency "
+            # NOTE(ameade): If the share is in a share group, we require its
+            # id be specified as a param.
+            if share.get('share_group_id'):
+                share_group_id = req.params.get('share_group_id')
+                if (share.get('share_group_id') and
+                        not share_group_id):
+                    msg = _("Must provide 'share_group_id' as a request "
+                            "parameter when deleting a share in a share "
                             "group.")
                     raise exc.HTTPBadRequest(explanation=msg)
-                elif consistency_group_id != share.get('consistency_group_id'):
-                    msg = _("The specified 'consistency_group_id' does not "
-                            "match the consistency group id of the share.")
+                elif share_group_id != share.get('share_group_id'):
+                    msg = _("The specified 'share_group_id' does not "
+                            "match the share group id of the share.")
                     raise exc.HTTPBadRequest(explanation=msg)
 
             self.share_api.delete(context, share)
@@ -236,7 +236,7 @@ class ShareMixin(object):
             'display_name', 'status', 'share_server_id', 'volume_type_id',
             'share_type_id', 'snapshot_id', 'host', 'share_network_id',
             'is_public', 'metadata', 'extra_specs', 'sort_key', 'sort_dir',
-            'consistency_group_id', 'cgsnapshot_id'
+            'share_group_id', 'group_snapshot_id'
         )
 
     def update(self, req, id, body):
@@ -267,8 +267,8 @@ class ShareMixin(object):
         return self._view_builder.detail(req, share)
 
     def create(self, req, body):
-        # Remove consistency group attributes
-        body.get('share', {}).pop('consistency_group_id', None)
+        # Remove share group attributes
+        body.get('share', {}).pop('share_group_id', None)
         share = self._create(req, body)
         return share
 
@@ -311,7 +311,7 @@ class ShareMixin(object):
             'availability_zone': availability_zone,
             'metadata': share.get('metadata'),
             'is_public': share.get('is_public', False),
-            'consistency_group_id': share.get('consistency_group_id')
+            'share_group_id': share.get('share_group_id')
         }
 
         snapshot_id = share.get('snapshot_id')
@@ -374,10 +374,10 @@ class ShareMixin(object):
                 share_type = def_share_type
 
         # Only use in create share feature. Create share from snapshot
-        # and create share with consistency group features not
+        # and create share with share group features not
         # need this check.
         if (not share_network_id and not snapshot
-                and not share.get('consistency_group_id')
+                and not share.get('share_group_id')
                 and share_type and share_type.get('extra_specs')
                 and (strutils.bool_from_string(share_type.get('extra_specs').
                      get('driver_handles_share_servers')))):

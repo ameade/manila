@@ -168,12 +168,12 @@ class ShareDatabaseAPITestCase(test.TestCase):
         self.assertEqual(1, len(actual_result))
         self.assertEqual(share['id'], actual_result[0].id)
 
-    def test_share_filter_all_by_consistency_group(self):
-        cg = db_utils.create_consistency_group()
-        share = db_utils.create_share(consistency_group_id=cg['id'])
+    def test_share_filter_all_by_share_group(self):
+        group = db_utils.create_share_group()
+        share = db_utils.create_share(share_group_id=group['id'])
 
-        actual_result = db_api.share_get_all_by_consistency_group_id(
-            self.ctxt, cg['id'])
+        actual_result = db_api.share_get_all_by_share_group_id(
+            self.ctxt, group['id'])
 
         self.assertEqual(1, len(actual_result))
         self.assertEqual(share['id'], actual_result[0].id)
@@ -193,20 +193,20 @@ class ShareDatabaseAPITestCase(test.TestCase):
 
         self.assertEqual('share-%s' % instance['id'], instance['name'])
 
-    def test_share_instance_get_all_by_consistency_group(self):
-        cg = db_utils.create_consistency_group()
-        db_utils.create_share(consistency_group_id=cg['id'])
+    def test_share_instance_get_all_by_share_group(self):
+        group = db_utils.create_share_group()
+        db_utils.create_share(share_group_id=group['id'])
         db_utils.create_share()
 
-        instances = db_api.share_instances_get_all_by_consistency_group_id(
-            self.ctxt, cg['id'])
+        instances = db_api.share_instances_get_all_by_share_group_id(
+            self.ctxt, group['id'])
 
         self.assertEqual(1, len(instances))
         instance = instances[0]
 
         self.assertEqual('share-%s' % instance['id'], instance['name'])
 
-    @ddt.data('host', 'consistency_group_id')
+    @ddt.data('host', 'share_group_id')
     def test_share_get_all_sort_by_share_instance_fields(self, sort_key):
         shares = [db_utils.create_share(**{sort_key: n, 'size': 1})
                   for n in ('test1', 'test2')]
@@ -255,7 +255,7 @@ class ShareDatabaseAPITestCase(test.TestCase):
         expected_share_keys = {
             'project_id', 'share_type_id', 'display_name',
             'name', 'share_proto', 'is_public',
-            'source_cgsnapshot_member_id',
+            'source_group_snapshot_member_id',
         }
         session = db_api.get_session()
 
@@ -303,7 +303,7 @@ class ShareDatabaseAPITestCase(test.TestCase):
         expected_share_keys = {
             'project_id', 'share_type_id', 'display_name',
             'name', 'share_proto', 'is_public',
-            'source_cgsnapshot_member_id',
+            'source_group_snapshot_member_id',
         }
         session = db_api.get_session()
 
@@ -368,7 +368,7 @@ class ShareDatabaseAPITestCase(test.TestCase):
         expected_share_keys = {
             'project_id', 'share_type_id', 'display_name',
             'name', 'share_proto', 'is_public',
-            'source_cgsnapshot_member_id',
+            'source_group_snapshot_member_id',
         }
 
         with session.begin():
@@ -413,7 +413,7 @@ class ShareDatabaseAPITestCase(test.TestCase):
         expected_extra_keys = {
             'project_id', 'share_type_id', 'display_name',
             'name', 'share_proto', 'is_public',
-            'source_cgsnapshot_member_id',
+            'source_group_snapshot_member_id',
         }
 
         share_replica = db_api.share_replica_get(self.ctxt, replica['id'])
@@ -430,7 +430,7 @@ class ShareDatabaseAPITestCase(test.TestCase):
         expected_extra_keys = {
             'project_id', 'share_type_id', 'display_name',
             'name', 'share_proto', 'is_public',
-            'source_cgsnapshot_member_id',
+            'source_group_snapshot_member_id',
         }
 
         share_replica = db_api.share_replica_get(
@@ -510,273 +510,309 @@ class ShareDatabaseAPITestCase(test.TestCase):
 
 
 @ddt.ddt
-class ConsistencyGroupDatabaseAPITestCase(test.TestCase):
-
+class ShareGroupDatabaseAPITestCase(test.TestCase):
     def setUp(self):
         """Run before each test."""
-        super(ConsistencyGroupDatabaseAPITestCase, self).setUp()
+        super(ShareGroupDatabaseAPITestCase, self).setUp()
         self.ctxt = context.get_admin_context()
 
-    def test_consistency_group_create_with_share_type(self):
+    def test_share_group_create_with_share_type(self):
         fake_share_types = ["fake_share_type"]
-        cg = db_utils.create_consistency_group(share_types=fake_share_types)
-        cg = db_api.consistency_group_get(self.ctxt, cg['id'])
+        group = db_utils.create_share_group(share_types=fake_share_types)
+        group = db_api.share_group_get(self.ctxt, group['id'])
 
-        self.assertEqual(1, len(cg['share_types']))
+        self.assertEqual(1, len(group['share_types']))
 
-    def test_consistency_group_get(self):
-        cg = db_utils.create_consistency_group()
+    def test_share_group_get(self):
+        group = db_utils.create_share_group()
 
-        self.assertDictMatch(dict(cg),
-                             dict(db_api.consistency_group_get(self.ctxt,
-                                                               cg['id'])))
+        self.assertDictMatch(dict(group),
+                             dict(db_api.share_group_get(self.ctxt,
+                                                         group['id'])))
 
-    def test_count_consistency_groups_in_share_network(self):
+    def test_count_share_groups_in_share_network(self):
         share_network = db_utils.create_share_network()
-        db_utils.create_consistency_group()
-        db_utils.create_consistency_group(share_network_id=share_network['id'])
+        db_utils.create_share_group()
+        db_utils.create_share_group(share_network_id=share_network['id'])
 
-        count = db_api.count_consistency_groups_in_share_network(
+        count = db_api.count_share_groups_in_share_network(
             self.ctxt, share_network_id=share_network['id'])
 
         self.assertEqual(1, count)
 
-    def test_consistency_group_get_all(self):
-        expected_cg = db_utils.create_consistency_group()
+    def test_share_group_get_all(self):
+        expected_group = db_utils.create_share_group()
 
-        cgs = db_api.consistency_group_get_all(self.ctxt, detailed=False)
+        groups = db_api.share_group_get_all(self.ctxt, detailed=False)
 
-        self.assertEqual(1, len(cgs))
-        cg = cgs[0]
-        self.assertEqual(2, len(dict(cg).keys()))
-        self.assertEqual(expected_cg['id'], cg['id'])
-        self.assertEqual(expected_cg['name'], cg['name'])
+        self.assertEqual(1, len(groups))
+        group = groups[0]
+        self.assertEqual(2, len(dict(group).keys()))
+        self.assertEqual(expected_group['id'], group['id'])
+        self.assertEqual(expected_group['name'], group['name'])
 
-    def test_consistency_group_get_all_with_detail(self):
-        expected_cg = db_utils.create_consistency_group()
+    def test_share_group_get_all_with_detail(self):
+        expected_group = db_utils.create_share_group()
 
-        cgs = db_api.consistency_group_get_all(self.ctxt, detailed=True)
+        groups = db_api.share_group_get_all(self.ctxt, detailed=True)
 
-        self.assertEqual(1, len(cgs))
-        cg = cgs[0]
-        self.assertDictMatch(dict(expected_cg), dict(cg))
+        self.assertEqual(1, len(groups))
+        group = groups[0]
+        self.assertDictMatch(dict(expected_group), dict(group))
 
-    def test_consistency_group_get_all_by_project(self):
+    def test_share_group_get_all_by_host(self):
+        fake_host = 'my_fake_host'
+        expected_group = db_utils.create_share_group(host=fake_host)
+        db_utils.create_share_group()
+
+        groups = db_api.share_group_get_all_by_host(self.ctxt, fake_host,
+                                                    detailed=False)
+
+        self.assertEqual(1, len(groups))
+        group = groups[0]
+        self.assertEqual(2, len(dict(group).keys()))
+        self.assertEqual(expected_group['id'], group['id'])
+        self.assertEqual(expected_group['name'], group['name'])
+
+    def test_share_group_get_all_by_host_with_details(self):
+        fake_host = 'my_fake_host'
+        expected_group = db_utils.create_share_group(host=fake_host)
+        db_utils.create_share_group()
+
+        groups = db_api.share_group_get_all_by_host(self.ctxt,
+                                                    fake_host,
+                                                    detailed=True)
+
+        self.assertEqual(1, len(groups))
+        group = groups[0]
+        self.assertDictMatch(dict(expected_group), dict(group))
+        self.assertEqual(fake_host, group['host'])
+
+    def test_share_group_get_all_by_project(self):
         fake_project = 'fake_project'
-        expected_cg = db_utils.create_consistency_group(
+        expected_group = db_utils.create_share_group(
             project_id=fake_project)
-        db_utils.create_consistency_group()
+        db_utils.create_share_group()
 
-        cgs = db_api.consistency_group_get_all_by_project(self.ctxt,
-                                                          fake_project,
-                                                          detailed=False)
+        groups = db_api.share_group_get_all_by_project(self.ctxt,
+                                                       fake_project,
+                                                       detailed=False)
 
-        self.assertEqual(1, len(cgs))
-        cg = cgs[0]
-        self.assertEqual(2, len(dict(cg).keys()))
-        self.assertEqual(expected_cg['id'], cg['id'])
-        self.assertEqual(expected_cg['name'], cg['name'])
+        self.assertEqual(1, len(groups))
+        group = groups[0]
+        self.assertEqual(2, len(dict(group).keys()))
+        self.assertEqual(expected_group['id'], group['id'])
+        self.assertEqual(expected_group['name'], group['name'])
 
-    def test_consistency_group_get_all_by_share_server(self):
+    def test_share_group_get_all_by_share_server(self):
         fake_server = 123
-        expected_cg = db_utils.create_consistency_group(
+        expected_group = db_utils.create_share_group(
             share_server_id=fake_server)
-        db_utils.create_consistency_group()
+        db_utils.create_share_group()
 
-        cgs = db_api.consistency_group_get_all_by_share_server(self.ctxt,
-                                                               fake_server)
+        groups = db_api.share_group_get_all_by_share_server(self.ctxt,
+                                                            fake_server)
 
-        self.assertEqual(1, len(cgs))
-        cg = cgs[0]
-        self.assertEqual(expected_cg['id'], cg['id'])
-        self.assertEqual(expected_cg['name'], cg['name'])
+        self.assertEqual(1, len(groups))
+        group = groups[0]
+        self.assertEqual(expected_group['id'], group['id'])
+        self.assertEqual(expected_group['name'], group['name'])
 
-    def test_consistency_group_get_all_by_project_with_details(self):
+    def test_share_group_get_all_by_project_with_details(self):
         fake_project = 'fake_project'
-        expected_cg = db_utils.create_consistency_group(
+        expected_group = db_utils.create_share_group(
             project_id=fake_project)
-        db_utils.create_consistency_group()
+        db_utils.create_share_group()
 
-        cgs = db_api.consistency_group_get_all_by_project(self.ctxt,
-                                                          fake_project,
-                                                          detailed=True)
+        groups = db_api.share_group_get_all_by_project(self.ctxt,
+                                                       fake_project,
+                                                       detailed=True)
 
-        self.assertEqual(1, len(cgs))
-        cg = cgs[0]
-        self.assertDictMatch(dict(expected_cg), dict(cg))
-        self.assertEqual(fake_project, cg['project_id'])
+        self.assertEqual(1, len(groups))
+        group = groups[0]
+        self.assertDictMatch(dict(expected_group), dict(group))
+        self.assertEqual(fake_project, group['project_id'])
 
-    def test_consistency_group_update(self):
+    def test_share_group_update(self):
         fake_name = "my_fake_name"
-        expected_cg = db_utils.create_consistency_group()
-        expected_cg['name'] = fake_name
+        expected_group = db_utils.create_share_group()
+        expected_group['name'] = fake_name
 
-        db_api.consistency_group_update(self.ctxt,
-                                        expected_cg['id'],
-                                        {'name': fake_name})
+        db_api.share_group_update(self.ctxt,
+                                  expected_group['id'],
+                                  {'name': fake_name})
 
-        cg = db_api.consistency_group_get(self.ctxt, expected_cg['id'])
-        self.assertEqual(fake_name, cg['name'])
+        group = db_api.share_group_get(self.ctxt, expected_group['id'])
+        self.assertEqual(fake_name, group['name'])
 
-    def test_consistency_group_destroy(self):
-        cg = db_utils.create_consistency_group()
-        db_api.consistency_group_get(self.ctxt, cg['id'])
+    def test_share_group_destroy(self):
+        group = db_utils.create_share_group()
+        db_api.share_group_get(self.ctxt, group['id'])
 
-        db_api.consistency_group_destroy(self.ctxt, cg['id'])
+        db_api.share_group_destroy(self.ctxt, group['id'])
 
-        self.assertRaises(exception.NotFound, db_api.consistency_group_get,
-                          self.ctxt, cg['id'])
+        self.assertRaises(exception.NotFound, db_api.share_group_get,
+                          self.ctxt, group['id'])
 
-    def test_count_shares_in_consistency_group(self):
-        cg = db_utils.create_consistency_group()
-        db_utils.create_share(consistency_group_id=cg['id'])
+    def test_count_shares_in_share_group(self):
+        group = db_utils.create_share_group()
+        db_utils.create_share(share_group_id=group['id'])
         db_utils.create_share()
 
-        count = db_api.count_shares_in_consistency_group(self.ctxt, cg['id'])
+        count = db_api.count_shares_in_share_group(self.ctxt, group['id'])
 
         self.assertEqual(1, count)
 
-    def test_count_cgsnapshots_in_consistency_group(self):
-        cg = db_utils.create_consistency_group()
-        db_utils.create_cgsnapshot(cg['id'])
-        db_utils.create_cgsnapshot(cg['id'])
+    def test_count_group_snapshots_in_share_group(self):
+        group = db_utils.create_share_group()
+        db_utils.create_group_snapshot(group['id'])
+        db_utils.create_group_snapshot(group['id'])
 
-        count = db_api.count_cgsnapshots_in_consistency_group(self.ctxt,
-                                                              cg['id'])
+        count = db_api.count_group_snapshots_in_share_group(self.ctxt,
+                                                            group['id'])
 
         self.assertEqual(2, count)
 
-    def test_cgsnapshot_get(self):
-        cg = db_utils.create_consistency_group()
-        cgsnap = db_utils.create_cgsnapshot(cg['id'])
+    def test_group_snapshot_get(self):
+        group = db_utils.create_share_group()
+        group_snap = db_utils.create_group_snapshot(group['id'])
 
-        self.assertDictMatch(dict(cgsnap),
-                             dict(db_api.cgsnapshot_get(self.ctxt,
-                                                        cgsnap['id'])))
+        self.assertDictMatch(dict(group_snap),
+                             dict(db_api.group_snapshot_get(self.ctxt,
+                                                            group_snap['id'])))
 
-    def test_cgsnapshot_get_all(self):
-        cg = db_utils.create_consistency_group()
-        expected_cgsnap = db_utils.create_cgsnapshot(cg['id'])
+    def test_group_snapshot_get_all(self):
+        group = db_utils.create_share_group()
+        expected_group_snap = db_utils.create_group_snapshot(group['id'])
 
-        snaps = db_api.cgsnapshot_get_all(self.ctxt, detailed=False)
-
-        self.assertEqual(1, len(snaps))
-        snap = snaps[0]
-        self.assertEqual(2, len(dict(snap).keys()))
-        self.assertEqual(expected_cgsnap['id'], snap['id'])
-        self.assertEqual(expected_cgsnap['name'], snap['name'])
-
-    def test_cgsnapshot_get_all_with_detail(self):
-        cg = db_utils.create_consistency_group()
-        expected_cgsnap = db_utils.create_cgsnapshot(cg['id'])
-
-        snaps = db_api.cgsnapshot_get_all(self.ctxt, detailed=True)
-
-        self.assertEqual(1, len(snaps))
-        snap = snaps[0]
-        self.assertDictMatch(dict(expected_cgsnap), dict(snap))
-
-    def test_cgsnapshot_get_all_by_project(self):
-        fake_project = 'fake_project'
-        cg = db_utils.create_consistency_group()
-        expected_cgsnap = db_utils.create_cgsnapshot(cg['id'],
-                                                     project_id=fake_project)
-
-        snaps = db_api.cgsnapshot_get_all_by_project(self.ctxt,
-                                                     fake_project,
-                                                     detailed=False)
+        snaps = db_api.group_snapshot_get_all(self.ctxt, detailed=False)
 
         self.assertEqual(1, len(snaps))
         snap = snaps[0]
         self.assertEqual(2, len(dict(snap).keys()))
-        self.assertEqual(expected_cgsnap['id'], snap['id'])
-        self.assertEqual(expected_cgsnap['name'], snap['name'])
+        self.assertEqual(expected_group_snap['id'], snap['id'])
+        self.assertEqual(expected_group_snap['name'], snap['name'])
 
-    def test_cgsnapshot_get_all_by_project_with_details(self):
-        fake_project = 'fake_project'
-        cg = db_utils.create_consistency_group()
-        expected_cgsnap = db_utils.create_cgsnapshot(cg['id'],
-                                                     project_id=fake_project)
+    def test_group_snapshot_get_all_with_detail(self):
+        group = db_utils.create_share_group()
+        expected_group_snap = db_utils.create_group_snapshot(group['id'])
 
-        snaps = db_api.cgsnapshot_get_all_by_project(self.ctxt,
-                                                     fake_project,
-                                                     detailed=True)
+        snaps = db_api.group_snapshot_get_all(self.ctxt, detailed=True)
 
         self.assertEqual(1, len(snaps))
         snap = snaps[0]
-        self.assertDictMatch(dict(expected_cgsnap), dict(snap))
+        self.assertDictMatch(dict(expected_group_snap), dict(snap))
+
+    def test_group_snapshot_get_all_by_project(self):
+        fake_project = 'fake_project'
+        group = db_utils.create_share_group()
+        expected_group_snap = db_utils.create_group_snapshot(
+            group['id'], project_id=fake_project)
+
+        snaps = db_api.group_snapshot_get_all_by_project(self.ctxt,
+                                                         fake_project,
+                                                         detailed=False)
+
+        self.assertEqual(1, len(snaps))
+        snap = snaps[0]
+        self.assertEqual(2, len(dict(snap).keys()))
+        self.assertEqual(expected_group_snap['id'], snap['id'])
+        self.assertEqual(expected_group_snap['name'], snap['name'])
+
+    def test_group_snapshot_get_all_by_project_with_details(self):
+        fake_project = 'fake_project'
+        group = db_utils.create_share_group()
+        expected_group_snap = db_utils.create_group_snapshot(
+            group['id'], project_id=fake_project)
+
+        snaps = db_api.group_snapshot_get_all_by_project(self.ctxt,
+                                                         fake_project,
+                                                         detailed=True)
+
+        self.assertEqual(1, len(snaps))
+        snap = snaps[0]
+        self.assertDictMatch(dict(expected_group_snap), dict(snap))
         self.assertEqual(fake_project, snap['project_id'])
 
-    def test_cgsnapshot_update(self):
+    def test_group_snapshot_update(self):
         fake_name = "my_fake_name"
-        cg = db_utils.create_consistency_group()
-        expected_cgsnap = db_utils.create_cgsnapshot(cg['id'])
-        expected_cgsnap['name'] = fake_name
+        group = db_utils.create_share_group()
+        expected_group_snap = db_utils.create_group_snapshot(group['id'])
+        expected_group_snap['name'] = fake_name
 
-        db_api.cgsnapshot_update(self.ctxt, expected_cgsnap['id'],
-                                 {'name': fake_name})
+        db_api.group_snapshot_update(self.ctxt, expected_group_snap['id'],
+                                     {'name': fake_name})
 
-        cgsnap = db_api.cgsnapshot_get(self.ctxt, expected_cgsnap['id'])
-        self.assertEqual(fake_name, cgsnap['name'])
+        group_snap = db_api.group_snapshot_get(self.ctxt,
+                                               expected_group_snap['id'])
+        self.assertEqual(fake_name, group_snap['name'])
 
-    def test_cgsnapshot_destroy(self):
-        cg = db_utils.create_consistency_group()
-        cgsnap = db_utils.create_cgsnapshot(cg['id'])
-        db_api.cgsnapshot_get(self.ctxt, cgsnap['id'])
+    def test_group_snapshot_destroy(self):
+        group = db_utils.create_share_group()
+        group_snap = db_utils.create_group_snapshot(group['id'])
+        db_api.group_snapshot_get(self.ctxt, group_snap['id'])
 
-        db_api.cgsnapshot_destroy(self.ctxt, cgsnap['id'])
+        db_api.group_snapshot_destroy(self.ctxt, group_snap['id'])
 
-        self.assertRaises(exception.NotFound, db_api.cgsnapshot_get,
-                          self.ctxt, cgsnap['id'])
+        self.assertRaises(exception.NotFound, db_api.group_snapshot_get,
+                          self.ctxt, group_snap['id'])
 
-    def test_cgsnapshot_members_get_all(self):
-        cg = db_utils.create_consistency_group()
-        cgsnap = db_utils.create_cgsnapshot(cg['id'])
-        expected_member = db_utils.create_cgsnapshot_member(cgsnap['id'])
+    def test_group_snapshot_members_get_all(self):
+        group = db_utils.create_share_group()
+        group_snap = db_utils.create_group_snapshot(group['id'])
+        expected_member = db_utils.create_group_snapshot_member(
+            group_snap['id'])
 
-        members = db_api.cgsnapshot_members_get_all(self.ctxt, cgsnap['id'])
+        members = db_api.group_snapshot_members_get_all(self.ctxt,
+                                                        group_snap['id'])
 
         self.assertEqual(1, len(members))
         member = members[0]
         self.assertDictMatch(dict(expected_member), dict(member))
 
-    def test_count_cgsnapshot_members_in_share(self):
+    def test_count_group_snapshot_members_in_share(self):
         share = db_utils.create_share()
         share2 = db_utils.create_share()
-        cg = db_utils.create_consistency_group()
-        cgsnap = db_utils.create_cgsnapshot(cg['id'])
-        db_utils.create_cgsnapshot_member(cgsnap['id'], share_id=share['id'])
-        db_utils.create_cgsnapshot_member(cgsnap['id'], share_id=share2['id'])
+        group = db_utils.create_share_group()
+        group_snap = db_utils.create_group_snapshot(group['id'])
+        db_utils.create_group_snapshot_member(group_snap['id'],
+                                              share_id=share['id'])
+        db_utils.create_group_snapshot_member(group_snap['id'],
+                                              share_id=share2['id'])
 
-        count = db_api.count_cgsnapshot_members_in_share(
+        count = db_api.count_group_snapshot_members_in_share(
             self.ctxt, share['id'])
 
         self.assertEqual(1, count)
 
-    def test_cgsnapshot_members_get(self):
-        cg = db_utils.create_consistency_group()
-        cgsnap = db_utils.create_cgsnapshot(cg['id'])
-        expected_member = db_utils.create_cgsnapshot_member(cgsnap['id'])
+    def test_group_snapshot_members_get(self):
+        group = db_utils.create_share_group()
+        group_snap = db_utils.create_group_snapshot(group['id'])
+        expected_member = db_utils.create_group_snapshot_member(
+            group_snap['id'])
 
-        member = db_api.cgsnapshot_member_get(self.ctxt,
-                                              expected_member['id'])
+        member = db_api.group_snapshot_member_get(self.ctxt,
+                                                  expected_member['id'])
 
         self.assertDictMatch(dict(expected_member), dict(member))
 
-    def test_cgsnapshot_members_get_not_found(self):
-        self.assertRaises(exception.CGSnapshotMemberNotFound,
-                          db_api.cgsnapshot_member_get, self.ctxt, 'fake_id')
+    def test_group_snapshot_members_get_not_found(self):
+        self.assertRaises(exception.GroupSnapshotMemberNotFound,
+                          db_api.group_snapshot_member_get, self.ctxt,
+                          'fake_id')
 
-    def test_cgsnapshot_member_update(self):
-        cg = db_utils.create_consistency_group()
-        cgsnap = db_utils.create_cgsnapshot(cg['id'])
-        expected_member = db_utils.create_cgsnapshot_member(cgsnap['id'])
+    def test_group_snapshot_member_update(self):
+        group = db_utils.create_share_group()
+        group_snap = db_utils.create_group_snapshot(group['id'])
+        expected_member = db_utils.create_group_snapshot_member(
+            group_snap['id'])
 
-        db_api.cgsnapshot_member_update(
+        db_api.group_snapshot_member_update(
             self.ctxt, expected_member['id'],
             {'status': constants.STATUS_AVAILABLE})
 
-        member = db_api.cgsnapshot_member_get(self.ctxt, expected_member['id'])
+        member = db_api.group_snapshot_member_get(self.ctxt,
+                                                  expected_member['id'])
         self.assertEqual(constants.STATUS_AVAILABLE, member['status'])
 
 

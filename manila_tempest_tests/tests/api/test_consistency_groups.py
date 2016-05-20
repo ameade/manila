@@ -27,8 +27,7 @@ CGSNAPSHOT_REQUIRED_ELEMENTS = {"id", "name", "description", "created_at",
                                 "status", "project_id", "links"}
 
 
-@testtools.skipUnless(CONF.share.run_consistency_group_tests,
-                      'Consistency Group tests disabled.')
+@testtools.skip('Consistency Group tests disabled.')
 class ConsistencyGroupsTest(base.BaseSharesTest):
     """Covers consistency group functionality."""
 
@@ -52,8 +51,8 @@ class ConsistencyGroupsTest(base.BaseSharesTest):
         self.shares_v2_client.delete_share(share['id'], params=params,
                                            version='2.4')
         self.shares_client.wait_for_resource_deletion(share_id=share['id'])
-        self.shares_v2_client.delete_consistency_group(consistency_group['id'],
-                                                       version='2.4')
+        self.shares_v2_client.delete_share_group(consistency_group['id'],
+                                                 version='2.4')
         self.shares_v2_client.wait_for_resource_deletion(
             cg_id=consistency_group['id'])
 
@@ -89,8 +88,8 @@ class ConsistencyGroupsTest(base.BaseSharesTest):
                              cgsnapshot_members))
 
         # delete snapshot
-        self.shares_v2_client.delete_cgsnapshot(cgsnapshot["id"],
-                                                version='2.4')
+        self.shares_v2_client.delete_group_snapshot(cgsnapshot["id"],
+                                                    version='2.4')
         self.shares_v2_client.wait_for_resource_deletion(
             cgsnapshot_id=cgsnapshot["id"])
         self.assertRaises(lib_exc.NotFound,

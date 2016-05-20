@@ -39,8 +39,8 @@ class ShareAPI(object):
             create_share() -> create_share_instance()
             delete_share() -> delete_share_instance()
             Add share_instance argument to allow_access() & deny_access()
-        1.5  - Add create_consistency_group, delete_consistency_group
-                create_cgsnapshot, and delete_cgsnapshot methods
+        1.5  - Add create_share_group, delete_share_group
+                create_group_snapshot, and delete_group_snapshot methods
         1.6  - Introduce Share migration:
             migrate_share()
             get_migration_info()
@@ -59,6 +59,10 @@ class ShareAPI(object):
             migration_get_driver_info()
         1.11 - Add create_replicated_snapshot() and
             delete_replicated_snapshot() methods
+        1.12  - Convert create_share_group, delete_share_group
+                create_group_snapshot, and delete_group_snapshot methods to
+                create_share_group, delete_share_group
+                create_group_snapshot, and delete_group_snapshot
     """
 
     BASE_RPC_API_VERSION = '1.0'
@@ -67,7 +71,7 @@ class ShareAPI(object):
         super(ShareAPI, self).__init__()
         target = messaging.Target(topic=CONF.share_topic,
                                   version=self.BASE_RPC_API_VERSION)
-        self.client = rpc.get_client(target, version_cap='1.11')
+        self.client = rpc.get_client(target, version_cap='1.12')
 
     def create_share_instance(self, context, share_instance, host,
                               request_spec, filter_properties,
@@ -231,33 +235,33 @@ class ShareAPI(object):
                           share_id=share['id'],
                           new_size=new_size)
 
-    def create_consistency_group(self, context, cg, host):
+    def create_share_group(self, context, group, host):
         new_host = utils.extract_host(host)
-        call_context = self.client.prepare(server=new_host, version='1.5')
+        call_context = self.client.prepare(server=new_host, version='1.12')
         call_context.cast(context,
-                          'create_consistency_group',
-                          cg_id=cg['id'])
+                          'create_share_group',
+                          group_id=group['id'])
 
-    def delete_consistency_group(self, context, cg):
-        new_host = utils.extract_host(cg['host'])
-        call_context = self.client.prepare(server=new_host, version='1.5')
+    def delete_share_group(self, context, group):
+        new_host = utils.extract_host(group['host'])
+        call_context = self.client.prepare(server=new_host, version='1.12')
         call_context.cast(context,
-                          'delete_consistency_group',
-                          cg_id=cg['id'])
+                          'delete_share_group',
+                          group_id=group['id'])
 
-    def create_cgsnapshot(self, context, cgsnapshot, host):
+    def create_group_snapshot(self, context, group_snapshot, host):
         new_host = utils.extract_host(host)
-        call_context = self.client.prepare(server=new_host, version='1.5')
+        call_context = self.client.prepare(server=new_host, version='1.12')
         call_context.cast(context,
-                          'create_cgsnapshot',
-                          cgsnapshot_id=cgsnapshot['id'])
+                          'create_group_snapshot',
+                          group_snapshot_id=group_snapshot['id'])
 
-    def delete_cgsnapshot(self, context, cgsnapshot, host):
+    def delete_group_snapshot(self, context, group_snapshot, host):
         new_host = utils.extract_host(host)
-        call_context = self.client.prepare(server=new_host, version='1.5')
+        call_context = self.client.prepare(server=new_host, version='1.12')
         call_context.cast(context,
-                          'delete_cgsnapshot',
-                          cgsnapshot_id=cgsnapshot['id'])
+                          'delete_group_snapshot',
+                          group_snapshot_id=group_snapshot['id'])
 
     def create_share_replica(self, context, share_replica, host,
                              request_spec, filter_properties):

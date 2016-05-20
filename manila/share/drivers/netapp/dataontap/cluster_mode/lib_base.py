@@ -225,7 +225,6 @@ class NetAppCmodeFileStorageLibrary(object):
             'driver_version': '1.0',
             'netapp_storage_family': 'ontap_cluster',
             'storage_protocol': 'NFS_CIFS',
-            'consistency_group_support': 'host',
             'pools': self._get_pools(),
         }
 
@@ -1013,7 +1012,7 @@ class NetAppCmodeFileStorageLibrary(object):
             else:
                 msg = _("Invalid data supplied for creating consistency group "
                         "from CG snapshot %s.") % cgsnapshot_dict['id']
-                raise exception.InvalidConsistencyGroup(reason=msg)
+                raise exception.InvalidShareGroup(reason=msg)
 
             clone_list.append(clone_info)
 

@@ -200,7 +200,7 @@ class ShareTypesController(wsgi.Controller):
             notifier_err = dict(id=id, error_message=six.text_type(err))
             self._notify_share_type_error(context, 'share_type.delete',
                                           notifier_err)
-            msg = 'Target share type is still in use.'
+            msg = _('Target share type is still in use.')
             raise webob.exc.HTTPBadRequest(explanation=msg)
         except exception.NotFound as err:
             notifier_err = dict(id=id, error_message=six.text_type(err))

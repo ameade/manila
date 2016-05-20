@@ -126,3 +126,7 @@ user documentation.
 2.20
 ----
   Add MTU in share network show API.
+
+2.21
+----
+  Convert consistency groups to share groups

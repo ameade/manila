@@ -2294,6 +2294,7 @@ class HuaweiShareDriverTestCase(test.TestCase):
         expected['free_capacity_gb'] = 0.0
         expected['qos'] = True
         expected["snapshot_support"] = True
+        expected["group_snapshot_support"] = True
         expected['replication_domain'] = None
         expected['filter_function'] = None
         expected['goodness_function'] = None

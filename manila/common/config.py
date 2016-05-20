@@ -128,6 +128,8 @@ global_opts = [
                help='Availability zone of this node.'),
     cfg.StrOpt('default_share_type',
                help='Default share type to use.'),
+    cfg.StrOpt('default_group_type',
+               help='Default group type to use.'),
     cfg.ListOpt('memcached_servers',
                 help='Memcached servers or None for in process cache.'),
     cfg.StrOpt('share_usage_audit_period',

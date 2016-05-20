@@ -511,7 +511,7 @@ class BaseSharesTest(test.BaseTestCase):
                                           client.share_network_id or None)
         consistency_group = client.create_consistency_group(**kwargs)
         resource = {
-            "type": "consistency_group",
+            "type": "share_group",
             "id": consistency_group["id"],
             "client": client}
         if cleanup_in_class:
@@ -780,11 +780,11 @@ class BaseSharesTest(test.BaseTestCase):
                     elif res["type"] is "share_type":
                         client.delete_share_type(res_id)
                         client.wait_for_resource_deletion(st_id=res_id)
-                    elif res["type"] is "consistency_group":
-                        client.delete_consistency_group(res_id)
+                    elif res["type"] is "share_group":
+                        client.delete_share_group(res_id)
                         client.wait_for_resource_deletion(cg_id=res_id)
                     elif res["type"] is "cgsnapshot":
-                        client.delete_cgsnapshot(res_id)
+                        client.delete_group_snapshot(res_id, )
                         client.wait_for_resource_deletion(cgsnapshot_id=res_id)
                     elif res["type"] is "share_replica":
                         client.delete_share_replica(res_id)

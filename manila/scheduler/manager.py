@@ -59,7 +59,7 @@ MAPPING = {
 class SchedulerManager(manager.Manager):
     """Chooses a host to create shares."""
 
-    RPC_API_VERSION = '1.6'
+    RPC_API_VERSION = '1.7'
 
     def __init__(self, scheduler_driver=None, service_name=None,
                  *args, **kwargs):
@@ -200,34 +200,30 @@ class SchedulerManager(manager.Manager):
     def request_service_capabilities(self, context):
         share_rpcapi.ShareAPI().publish_service_capabilities(context)
 
-    def _set_cg_error_state(self, method, context, ex, request_spec):
+    def _set_group_error_state(self, method, context, ex, request_spec):
         LOG.warning(_LW("Failed to schedule_%(method)s: %(ex)s"),
                     {"method": method, "ex": ex})
 
-        cg_state = {'status': constants.STATUS_ERROR}
+        group_state = {'status': constants.STATUS_ERROR}
 
-        consistency_group_id = request_spec.get('consistency_group_id')
+        share_group_id = request_spec.get('share_group_id')
 
-        if consistency_group_id:
-            db.consistency_group_update(context,
-                                        consistency_group_id,
-                                        cg_state)
+        if share_group_id:
+            db.share_group_update(context, share_group_id, group_state)
 
-        # TODO(ameade): add notifications
-
-    def create_consistency_group(self, context, cg_id, request_spec=None,
-                                 filter_properties=None):
+    def create_share_group(self, context, group_id, request_spec=None,
+                           filter_properties=None):
         try:
-            self.driver.schedule_create_consistency_group(context, cg_id,
-                                                          request_spec,
-                                                          filter_properties)
+            self.driver.schedule_create_share_group(context, group_id,
+                                                    request_spec,
+                                                    filter_properties)
         except exception.NoValidHost as ex:
-            self._set_cg_error_state('create_consistency_group',
-                                     context, ex, request_spec)
+            self._set_group_error_state('create_share_group',
+                                        context, ex, request_spec)
         except Exception as ex:
             with excutils.save_and_reraise_exception():
-                self._set_cg_error_state('create_consistency_group',
-                                         context, ex, request_spec)
+                self._set_group_error_state('create_share_group',
+                                            context, ex, request_spec)
 
     def _set_share_replica_error_state(self, context, method, exc,
                                        request_spec):

@@ -34,19 +34,19 @@ class SchedulerAPI(object):
         1.1 - Add get_pools method
         1.2 - Introduce Share Instances. Replace ``create_share()`` with
         ``create_share_instance()``
-        1.3 - Add create_consistency_group method
         1.4 - Add migrate_share_to_host method
         1.5 - Add create_share_replica
         1.6 - Add manage_share
+        1.7 - Add create_share_group_method
     """
 
-    RPC_API_VERSION = '1.6'
+    RPC_API_VERSION = '1.7'
 
     def __init__(self):
         super(SchedulerAPI, self).__init__()
         target = messaging.Target(topic=CONF.scheduler_topic,
                                   version=self.RPC_API_VERSION)
-        self.client = rpc.get_client(target, version_cap='1.6')
+        self.client = rpc.get_client(target, version_cap=self.RPC_API_VERSION)
 
     def create_share_instance(self, context, request_spec=None,
                               filter_properties=None):
@@ -71,13 +71,28 @@ class SchedulerAPI(object):
         call_context = self.client.prepare(version='1.1')
         return call_context.call(context, 'get_pools', filters=filters)
 
-    def create_consistency_group(self, context, cg_id, request_spec=None,
-                                 filter_properties=None):
+    def create_share_group(self, context, group_id, request_spec=None,
+                           filter_properties=None):
+        """Casts an rpc to the scheduler to create a share group.
+
+        :param context:
+        :param group_id:
+        :param request_spec:
+        Example::
+            {
+                'share_group_type_id': ,
+                'share_group_id': 'b67d812a-5db2-43b8-8841-4a2f05c3c571',
+                'share_types': [models.ShareType],
+                'resource_type': models.ShareGroup,
+            }
+        :param filter_properties:
+        :return:
+        """
         request_spec_p = jsonutils.to_primitive(request_spec)
-        call_context = self.client.prepare(version='1.3')
+        call_context = self.client.prepare(version='1.7')
         return call_context.cast(context,
-                                 'create_consistency_group',
-                                 cg_id=cg_id,
+                                 'create_share_group',
+                                 group_id=group_id,
                                  request_spec=request_spec_p,
                                  filter_properties=filter_properties)
 

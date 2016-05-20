@@ -320,7 +320,6 @@ class ZFSonLinuxShareDriver(zfs_utils.ExecuteMixin, driver.ShareDriver):
             'storage_protocol': 'NFS',
             'reserved_percentage':
                 self.configuration.reserved_share_percentage,
-            'consistency_group_support': None,
             'snapshot_support': True,
             'driver_name': 'ZFS',
             'pools': self._get_pools_info(),

@@ -195,7 +195,7 @@ class ConsistencyGroupsNegativeTest(base.BaseSharesAdminTest):
         self.shares_v2_client.wait_for_cgsnapshot_status(cgsnapshot['id'],
                                                          'creating')
         self.assertRaises(exceptions.Conflict,
-                          self.shares_v2_client.delete_cgsnapshot,
+                          self.shares_v2_client.delete_group_snapshot,
                           cgsnapshot['id'],
                           version='2.4')
         # deleting
@@ -205,7 +205,7 @@ class ConsistencyGroupsNegativeTest(base.BaseSharesAdminTest):
         self.shares_v2_client.wait_for_cgsnapshot_status(cgsnapshot['id'],
                                                          'deleting')
         self.assertRaises(exceptions.Conflict,
-                          self.shares_v2_client.delete_cgsnapshot,
+                          self.shares_v2_client.delete_group_snapshot,
                           cgsnapshot['id'],
                           version='2.4')
 
@@ -223,7 +223,7 @@ class ConsistencyGroupsNegativeTest(base.BaseSharesAdminTest):
         self.shares_v2_client.wait_for_consistency_group_status(
             consistency_group['id'], 'creating')
         self.assertRaises(exceptions.Conflict,
-                          self.shares_v2_client.delete_consistency_group,
+                          self.shares_v2_client.delete_share_group,
                           consistency_group['id'],
                           version='2.4')
         # deleting
@@ -232,7 +232,7 @@ class ConsistencyGroupsNegativeTest(base.BaseSharesAdminTest):
         self.shares_v2_client.wait_for_consistency_group_status(
             consistency_group['id'], 'deleting')
         self.assertRaises(exceptions.Conflict,
-                          self.shares_v2_client.delete_consistency_group,
+                          self.shares_v2_client.delete_share_group,
                           consistency_group['id'],
                           version='2.4')
 
@@ -266,12 +266,12 @@ class ConsistencyGroupsNegativeTest(base.BaseSharesAdminTest):
         multi_tenant_share_type = share_type['share_type']
 
         def create_cg():
-            cg = self.shares_v2_client.create_consistency_group(
+            cg = self.shares_v2_client.create_share_group(
                 share_type_ids=[multi_tenant_share_type['id']],
                 version='2.4'
             )
             resource = {
-                "type": "consistency_group",
+                "type": "share_group",
                 "id": cg["id"],
                 "client": self.shares_client
             }

@@ -1259,11 +1259,11 @@ def share_instances_get_all_by_share(context, share_id):
 
 
 @require_context
-def share_instances_get_all_by_consistency_group_id(context, cg_id):
-    """Returns list of share instances that belong to given cg."""
+def share_instances_get_all_by_share_group_id(context, group_id):
+    """Returns list of share instances that belong to given group."""
     result = (
         model_query(context, models.Share).filter(
-            models.Share.consistency_group_id == cg_id,
+            models.Share.share_group_id == group_id,
         ).all()
     )
     instances = []
@@ -1512,7 +1512,7 @@ def share_get(context, share_id, session=None):
 
 
 def _share_get_all_with_filters(context, project_id=None, share_server_id=None,
-                                consistency_group_id=None, filters=None,
+                                share_group_id=None, filters=None,
                                 is_public=False, sort_key=None,
                                 sort_dir=None):
     """Returns sorted list of shares that satisfies filters.
@@ -1549,9 +1549,9 @@ def _share_get_all_with_filters(context, project_id=None, share_server_id=None,
         query = query.filter(
             models.ShareInstance.share_server_id == share_server_id)
 
-    if consistency_group_id:
+    if share_group_id:
         query = query.filter(
-            models.Share.consistency_group_id == consistency_group_id)
+            models.Share.share_group_id == share_group_id)
 
     # Apply filters
     if not filters:
@@ -1615,12 +1615,12 @@ def share_get_all_by_project(context, project_id, filters=None,
 
 
 @require_context
-def share_get_all_by_consistency_group_id(context, cg_id,
-                                          filters=None, sort_key=None,
-                                          sort_dir=None):
-    """Returns list of shares with given CG ID."""
+def share_get_all_by_share_group_id(context, share_group_id,
+                                    filters=None, sort_key=None,
+                                    sort_dir=None):
+    """Returns list of shares with given group ID."""
     query = _share_get_all_with_filters(
-        context, consistency_group_id=cg_id,
+        context, share_group_id=share_group_id,
         filters=filters, sort_key=sort_key, sort_dir=sort_dir,
     )
     return query
@@ -2802,7 +2802,7 @@ def share_server_get_all_unused_deletable(context, host, updated_before):
     )
     result = _server_get_query(context)\
         .filter_by(host=host)\
-        .filter(~models.ShareServer.consistency_groups.any())\
+        .filter(~models.ShareServer.share_groups.any())\
         .filter(~models.ShareServer.share_instances.any())\
         .filter(models.ShareServer.status.in_(valid_server_status))\
         .filter(models.ShareServer.updated_at < updated_before).all()
@@ -3186,12 +3186,12 @@ def share_type_destroy(context, id):
         results = model_query(context, models.Share, session=session,
                               read_deleted="no").\
             filter_by(share_type_id=id).count()
-        cg_count = model_query(context,
-                               models.ConsistencyGroupShareTypeMapping,
-                               read_deleted="no",
-                               session=session).\
+        group_count = model_query(context,
+                                  models.ShareGroupShareTypeMapping,
+                                  read_deleted="no",
+                                  session=session).\
             filter_by(share_type_id=id).count()
-        if results or cg_count:
+        if results or group_count:
             LOG.error(_LE('ShareType %s deletion failed, ShareType in use.'),
                       id)
             raise exception.ShareTypeInUse(share_type_id=id)
@@ -3403,43 +3403,91 @@ def availability_zone_get_all(context):
 ####################
 
 
-def _consistency_group_get(context, consistency_group_id, session=None):
+def _share_group_get(context, share_group_id, session=None):
     session = session or get_session()
-    result = model_query(context, models.ConsistencyGroup,
+    result = model_query(context, models.ShareGroup,
                          session=session,
                          project_only=True,
                          read_deleted='no').\
-        filter_by(id=consistency_group_id).\
+        filter_by(id=share_group_id).\
         options(joinedload('share_types')).\
         first()
 
     if not result:
-        raise exception.ConsistencyGroupNotFound(
-            consistency_group_id=consistency_group_id)
+        raise exception.ShareGroupNotFound(share_group_id=share_group_id)
 
     return result
 
 
 @require_context
-def consistency_group_get(context, consistency_group_id, session=None):
-    return _consistency_group_get(context, consistency_group_id,
-                                  session=session)
+def share_group_get(context, share_group_id, session=None):
+    return _share_group_get(context, share_group_id, session=session)
 
 
-def _consistency_group_get_all_query(context, session=None):
+def _share_group_get_all_query(context, session=None, filters=None,
+                               sort_key=None, sort_dir=None):
     session = session or get_session()
-    return model_query(context, models.ConsistencyGroup, session=session,
-                       read_deleted='no')
+    if not sort_key:
+        sort_key = 'created_at'
+    if not sort_dir:
+        sort_dir = 'desc'
+
+    query = model_query(context, models.ShareGroup, session=session,
+                        read_deleted='no')
+
+    # Apply filters
+    if not filters:
+        filters = {}
+    for k, v in filters.iteritems():
+        filter_attr = getattr(models.ShareGroup, k)
+        query = query.filter(filter_attr == v)
+
+    # Apply sorting
+    if sort_dir.lower() not in ('desc', 'asc'):
+        msg = _("Wrong sorting data provided: sort key is '%(sort_key)s' "
+                "and sort direction is '%(sort_dir)s'.") % {
+                    "sort_key": sort_key, "sort_dir": sort_dir}
+        raise exception.InvalidInput(reason=msg)
+
+    def apply_sorting(model, _query):
+        sort_attr = getattr(model, sort_key)
+        sort_method = getattr(sort_attr, sort_dir.lower())
+        return _query.order_by(sort_method())
+
+    try:
+        query = apply_sorting(models.ShareGroup, query)
+    except AttributeError:
+        msg = _("Wrong sorting key provided - '%s'.") % sort_key
+        raise exception.InvalidInput(reason=msg)
+
+    return query
 
 
 @require_admin_context
-def consistency_group_get_all(context, detailed=True):
-    query = _consistency_group_get_all_query(context)
+def share_group_get_all(context, detailed=True, filters=None, sort_key=None,
+                        sort_dir=None):
+    query = _share_group_get_all_query(context, filters=filters,
+                                       sort_key=sort_key, sort_dir=sort_dir)
     if detailed:
         return query.options(joinedload('share_types')).all()
     else:
-        query = query.with_entities(models.ConsistencyGroup.id,
-                                    models.ConsistencyGroup.name)
+        query = query.with_entities(models.ShareGroup.id,
+                                    models.ShareGroup.name)
+        values = []
+        for item in query.all():
+            id, name = item
+            values.append({"id": id, "name": name})
+        return values
+
+
+@require_admin_context
+def share_group_get_all_by_host(context, host, detailed=True):
+    query = _share_group_get_all_query(context).filter_by(host=host)
+    if detailed:
+        return query.options(joinedload('share_types')).all()
+    else:
+        query = query.with_entities(models.ShareGroup.id,
+                                    models.ShareGroup.name)
         values = []
         for item in query.all():
             id, name = item
@@ -3448,15 +3496,17 @@ def consistency_group_get_all(context, detailed=True):
 
 
 @require_context
-def consistency_group_get_all_by_project(context, project_id, detailed=True):
+def share_group_get_all_by_project(context, project_id, detailed=True,
+                                   filters=None, sort_key=None, sort_dir=None):
     authorize_project_context(context, project_id)
-    query = _consistency_group_get_all_query(context).filter_by(
-        project_id=project_id)
+    query = _share_group_get_all_query(context, filters=filters,
+                                       sort_key=sort_key, sort_dir=sort_dir
+                                       ).filter_by(project_id=project_id)
     if detailed:
         return query.options(joinedload('share_types')).all()
     else:
-        query = query.with_entities(models.ConsistencyGroup.id,
-                                    models.ConsistencyGroup.name)
+        query = query.with_entities(models.ShareGroup.id,
+                                    models.ShareGroup.name)
         values = []
         for item in query.all():
             id, name = item
@@ -3465,139 +3515,177 @@ def consistency_group_get_all_by_project(context, project_id, detailed=True):
 
 
 @require_context
-def consistency_group_get_all_by_share_server(context, share_server_id):
-    return _consistency_group_get_all_query(context).filter_by(
+def share_group_get_all_by_share_server(context, share_server_id,
+                                        filters=None, sort_key=None,
+                                        sort_dir=None):
+    return _share_group_get_all_query(context, filters=filters,
+                                      sort_key=sort_key, sort_dir=sort_dir
+                                      ).filter_by(
         share_server_id=share_server_id).all()
 
 
 @require_context
-def consistency_group_create(context, values):
-    consistency_group = models.ConsistencyGroup()
+def share_group_create(context, values):
+    share_group = models.ShareGroup()
     if not values.get('id'):
         values['id'] = six.text_type(uuid.uuid4())
 
     mappings = []
     for item in values.get('share_types') or []:
-        mapping = models.ConsistencyGroupShareTypeMapping()
+        mapping = models.ShareGroupShareTypeMapping()
         mapping['id'] = six.text_type(uuid.uuid4())
         mapping['share_type_id'] = item
-        mapping['consistency_group_id'] = values['id']
+        mapping['share_group_id'] = values['id']
         mappings.append(mapping)
 
     values['share_types'] = mappings
 
     session = get_session()
     with session.begin():
-        consistency_group.update(values)
-        session.add(consistency_group)
+        share_group.update(values)
+        session.add(share_group)
 
-        return _consistency_group_get(context, values['id'], session=session)
+        return _share_group_get(context, values['id'], session=session)
 
 
 @require_context
-def consistency_group_update(context, consistency_group_id, values):
+def share_group_update(context, share_group_id, values):
     session = get_session()
     with session.begin():
-        cg_ref = _consistency_group_get(context, consistency_group_id,
-                                        session=session)
-
-        cg_ref.update(values)
-        cg_ref.save(session=session)
-        return cg_ref
+        group_ref = _share_group_get(context, share_group_id, session=session)
+        group_ref.update(values)
+        group_ref.save(session=session)
+        return group_ref
 
 
 @require_admin_context
-def consistency_group_destroy(context, consistency_group_id):
+def share_group_destroy(context, share_group_id):
     session = get_session()
     with session.begin():
-        cg_ref = _consistency_group_get(context, consistency_group_id,
-                                        session=session)
-        cg_ref.soft_delete(session)
+        group_ref = _share_group_get(context, share_group_id,
+                                     session=session)
+        group_ref.soft_delete(session)
 
-        session.query(models.ConsistencyGroupShareTypeMapping).\
-            filter_by(consistency_group_id=cg_ref['id']).soft_delete()
+        session.query(models.ShareGroupShareTypeMapping).\
+            filter_by(share_group_id=group_ref['id']).soft_delete()
 
 
 @require_context
-def count_shares_in_consistency_group(context, consistency_group_id,
-                                      session=None):
+def count_shares_in_share_group(context, share_group_id, session=None):
     session = session or get_session()
     return model_query(
         context, models.Share, session=session,
         project_only=True, read_deleted="no").\
-        filter_by(consistency_group_id=consistency_group_id).\
+        filter_by(share_group_id=share_group_id).\
         count()
 
 
 @require_context
-def count_cgsnapshots_in_consistency_group(context, consistency_group_id,
-                                           session=None):
+def count_group_snapshots_in_share_group(context, share_group_id,
+                                         session=None):
     session = session or get_session()
     return model_query(
-        context, models.CGSnapshot, session=session,
+        context, models.GroupSnapshot, session=session,
         project_only=True, read_deleted="no").\
-        filter_by(consistency_group_id=consistency_group_id).\
+        filter_by(share_group_id=share_group_id).\
         count()
 
 
 @require_context
-def count_consistency_groups_in_share_network(context, share_network_id,
-                                              session=None):
+def count_share_groups_in_share_network(context, share_network_id,
+                                        session=None):
     session = session or get_session()
     return model_query(
-        context, models.ConsistencyGroup, session=session,
+        context, models.ShareGroup, session=session,
         project_only=True, read_deleted="no").\
         filter_by(share_network_id=share_network_id).\
         count()
 
 
 @require_context
-def count_cgsnapshot_members_in_share(context, share_id, session=None):
+def count_group_snapshot_members_in_share(context, share_id, session=None):
     session = session or get_session()
     return model_query(
-        context, models.CGSnapshotMember, session=session,
+        context, models.GroupSnapshotMember, session=session,
         project_only=True, read_deleted="no").\
         filter_by(share_id=share_id).\
         count()
 
 
-def _cgsnapshot_get(context, cgsnapshot_id, session=None):
+@require_context
+def _group_snapshot_get(context, group_snapshot_id, session=None):
     session = session or get_session()
-    result = model_query(context, models.CGSnapshot, session=session,
+    result = model_query(context, models.GroupSnapshot, session=session,
                          project_only=True, read_deleted='no').\
-        options(joinedload('cgsnapshot_members')).\
-        options(joinedload('consistency_group')).\
-        filter_by(id=cgsnapshot_id).\
+        options(joinedload('group_snapshot_members')).\
+        options(joinedload('share_group')).\
+        filter_by(id=group_snapshot_id).\
         first()
 
     if not result:
-        raise exception.CGSnapshotNotFound(cgsnapshot_id=cgsnapshot_id)
+        raise exception.GroupSnapshotNotFound(
+            group_snapshot_id=group_snapshot_id)
 
     return result
 
 
-def _cgsnapshot_get_all_query(context, session=None):
+def _group_snapshot_get_all_query(context, session=None, filters=None,
+                                  sort_key=None, sort_dir=None):
     session = session or get_session()
-    return model_query(context, models.CGSnapshot, session=session,
-                       reade_deleted='no').\
-        options(joinedload('cgsnapshot_members')).\
-        options(joinedload('consistency_group'))
+    if not sort_key:
+        sort_key = 'created_at'
+    if not sort_dir:
+        sort_dir = 'desc'
+
+    query = model_query(context, models.GroupSnapshot, session=session,
+                        read_deleted='no').\
+        options(joinedload('group_snapshot_members')).\
+        options(joinedload('share_group'))
+
+    # Apply filters
+    if not filters:
+        filters = {}
+    for k, v in filters.iteritems():
+        filter_attr = getattr(models.GroupSnapshot, k)
+        query = query.filter(filter_attr == v)
+
+    # Apply sorting
+    if sort_dir.lower() not in ('desc', 'asc'):
+        msg = _("Wrong sorting data provided: sort key is '%(sort_key)s' "
+                "and sort direction is '%(sort_dir)s'.") % {
+                    "sort_key": sort_key, "sort_dir": sort_dir}
+        raise exception.InvalidInput(reason=msg)
+
+    def apply_sorting(model, _query):
+        sort_attr = getattr(model, sort_key)
+        sort_method = getattr(sort_attr, sort_dir.lower())
+        return _query.order_by(sort_method())
+
+    try:
+        query = apply_sorting(models.GroupSnapshot, query)
+    except AttributeError:
+        msg = _("Wrong sorting key provided - '%s'.") % sort_key
+        raise exception.InvalidInput(reason=msg)
+
+    return query
 
 
 @require_context
-def cgsnapshot_get(context, cgsnapshot_id, session=None):
+def group_snapshot_get(context, group_snapshot_id, session=None):
     session = session or get_session()
-    return _cgsnapshot_get(context, cgsnapshot_id, session=session)
+    return _group_snapshot_get(context, group_snapshot_id, session=session)
 
 
 @require_admin_context
-def cgsnapshot_get_all(context, detailed=True):
-    query = _cgsnapshot_get_all_query(context)
+def group_snapshot_get_all(context, detailed=True, filters=None, sort_key=None,
+                           sort_dir=None):
+    query = _group_snapshot_get_all_query(context, filters=filters,
+                                          sort_key=sort_key, sort_dir=sort_dir)
     if detailed:
         return query.all()
     else:
-        query = query.with_entities(models.CGSnapshot.id,
-                                    models.CGSnapshot.name)
+        query = query.with_entities(models.GroupSnapshot.id,
+                                    models.GroupSnapshot.name)
         values = []
         for item in query.all():
             id, name = item
@@ -3606,15 +3694,18 @@ def cgsnapshot_get_all(context, detailed=True):
 
 
 @require_context
-def cgsnapshot_get_all_by_project(context, project_id, detailed=True):
+def group_snapshot_get_all_by_project(context, project_id, detailed=True,
+                                      filters=None, sort_key=None,
+                                      sort_dir=None):
     authorize_project_context(context, project_id)
-    query = _cgsnapshot_get_all_query(context).filter_by(
-        project_id=project_id)
+    query = _group_snapshot_get_all_query(context, filters=filters,
+                                          sort_key=sort_key, sort_dir=sort_dir
+                                          ).filter_by(project_id=project_id)
     if detailed:
         return query.all()
     else:
-        query = query.with_entities(models.CGSnapshot.id,
-                                    models.CGSnapshot.name)
+        query = query.with_entities(models.GroupSnapshot.id,
+                                    models.GroupSnapshot.name)
         values = []
         for item in query.all():
             id, name = item
@@ -3623,66 +3714,68 @@ def cgsnapshot_get_all_by_project(context, project_id, detailed=True):
 
 
 @require_context
-def cgsnapshot_create(context, values):
-    cgsnapshot = models.CGSnapshot()
+def group_snapshot_create(context, values):
+    group_snapshot = models.GroupSnapshot()
     if not values.get('id'):
         values['id'] = six.text_type(uuid.uuid4())
 
     session = get_session()
     with session.begin():
-        cgsnapshot.update(values)
-        session.add(cgsnapshot)
+        group_snapshot.update(values)
+        session.add(group_snapshot)
 
-        return _cgsnapshot_get(context, values['id'], session=session)
+        return _group_snapshot_get(context, values['id'], session=session)
 
 
 @require_context
-def cgsnapshot_update(context, cgsnapshot_id, values):
+def group_snapshot_update(context, group_snapshot_id, values):
     session = get_session()
     with session.begin():
-        cg_ref = _cgsnapshot_get(context, cgsnapshot_id, session=session)
+        group_ref = _group_snapshot_get(context, group_snapshot_id,
+                                        session=session)
 
-        cg_ref.update(values)
-        cg_ref.save(session=session)
-        return cg_ref
+        group_ref.update(values)
+        group_ref.save(session=session)
+        return group_ref
 
 
 @require_admin_context
-def cgsnapshot_destroy(context, cgsnapshot_id):
+def group_snapshot_destroy(context, group_snapshot_id):
     session = get_session()
     with session.begin():
-        cgsnap_ref = _cgsnapshot_get(context, cgsnapshot_id, session=session)
-        cgsnap_ref.soft_delete(session)
+        group_snap_ref = _group_snapshot_get(context, group_snapshot_id,
+                                             session=session)
+        group_snap_ref.soft_delete(session)
 
-        session.query(models.CGSnapshotMember).\
-            filter_by(cgsnapshot_id=cgsnapshot_id).soft_delete()
+        session.query(models.GroupSnapshotMember).\
+            filter_by(group_snapshot_id=group_snapshot_id).soft_delete()
 
 
 @require_context
-def cgsnapshot_members_get_all(context, cgsnapshot_id, session=None):
+def group_snapshot_members_get_all(context, group_snapshot_id, session=None):
     session = session or get_session()
-    query = model_query(context, models.CGSnapshotMember,
+    query = model_query(context, models.GroupSnapshotMember,
                         session=session, read_deleted='no').filter_by(
-        cgsnapshot_id=cgsnapshot_id)
+        group_snapshot_id=group_snapshot_id)
     return query.all()
 
 
 @require_context
-def cgsnapshot_member_get(context, member_id, session=None):
-    result = model_query(context, models.CGSnapshotMember, session=session,
+def group_snapshot_member_get(context, member_id, session=None):
+    result = model_query(context, models.GroupSnapshotMember, session=session,
                          project_only=True, read_deleted='no').\
         filter_by(id=member_id).\
         first()
 
     if not result:
-        raise exception.CGSnapshotMemberNotFound(member_id=member_id)
+        raise exception.GroupSnapshotMemberNotFound(member_id=member_id)
 
     return result
 
 
 @require_context
-def cgsnapshot_member_create(context, values):
-    member = models.CGSnapshotMember()
+def group_snapshot_member_create(context, values):
+    member = models.GroupSnapshotMember()
     if not values.get('id'):
         values['id'] = six.text_type(uuid.uuid4())
 
@@ -3691,15 +3784,308 @@ def cgsnapshot_member_create(context, values):
         member.update(values)
         session.add(member)
 
-        return cgsnapshot_member_get(context, values['id'], session=session)
+        return group_snapshot_member_get(context, values['id'],
+                                         session=session)
 
 
 @require_context
-def cgsnapshot_member_update(context, member_id, values):
+def group_snapshot_member_update(context, member_id, values):
     session = get_session()
     with session.begin():
-        member = cgsnapshot_member_get(context, member_id, session=session)
+        member = group_snapshot_member_get(context, member_id, session=session)
         member.update(values)
         session.add(member)
 
-        return cgsnapshot_member_get(context, member_id, session=session)
+        return group_snapshot_member_get(context, member_id, session=session)
+
+
+####################
+
+
+@require_admin_context
+def group_type_create(context, values, projects=None):
+    """Create a new group_type.
+
+    In order to pass in extra specs, the values dict should contain a
+    'extra_specs' key/value pair:
+    {'extra_specs' : {'k1': 'v1', 'k2': 'v2', ...}}
+    """
+    values = ensure_model_dict_has_id(values)
+
+    projects = projects or []
+
+    session = get_session()
+    with session.begin():
+        try:
+            values['extra_specs'] = _metadata_refs(
+                values.get('extra_specs'), models.ShareGroupTypeExtraSpecs)
+            mappings = []
+            for item in values.get('share_types') or []:
+                mapping = models.ShareGroupTypeShareTypeMapping()
+                mapping['id'] = six.text_type(uuid.uuid4())
+                mapping['share_type_id'] = item
+                mapping['share_group_type_id'] = values['id']
+                mappings.append(mapping)
+
+            values['share_types'] = mappings
+            group_type_ref = models.ShareGroupTypes()
+            group_type_ref.update(values)
+            group_type_ref.save(session=session)
+        except db_exception.DBDuplicateEntry:
+            raise exception.GroupTypeExists(id=values['name'])
+        except Exception as e:
+            raise db_exception.DBError(e)
+
+        for project in set(projects):
+            access_ref = models.ShareGroupTypeProjects()
+            access_ref.update({"share_group_type_id": group_type_ref.id,
+                               "project_id": project})
+            access_ref.save(session=session)
+
+        return group_type_ref
+
+
+def _group_type_get_query(context, session=None, read_deleted=None,
+                          expected_fields=None):
+    expected_fields = expected_fields or []
+    query = model_query(context,
+                        models.ShareGroupTypes,
+                        session=session,
+                        read_deleted=read_deleted). \
+        options(joinedload('extra_specs')). \
+        options(joinedload('share_types'))
+
+    if 'projects' in expected_fields:
+        query = query.options(joinedload('projects'))
+
+    if not context.is_admin:
+        the_filter = [models.ShareGroupTypes.is_public == true()]
+        projects_attr = getattr(models.ShareGroupTypes, 'projects')
+        the_filter.extend([
+            projects_attr.any(project_id=context.project_id)
+        ])
+        query = query.filter(or_(*the_filter))
+
+    return query
+
+
+@require_context
+def group_type_get_all(context, inactive=False, filters=None):
+    """Returns a dict describing all group_types with name as key."""
+    filters = filters or {}
+
+    read_deleted = "yes" if inactive else "no"
+
+    query = _group_type_get_query(context, read_deleted=read_deleted)
+
+    if 'is_public' in filters and filters['is_public'] is not None:
+        the_filter = [models.ShareGroupTypes.is_public == filters['is_public']]
+        if filters['is_public'] and context.project_id is not None:
+            projects_attr = getattr(models. ShareGroupTypes, 'projects')
+            the_filter.extend([
+                projects_attr.any(
+                    project_id=context.project_id, deleted=0)
+            ])
+        if len(the_filter) > 1:
+            query = query.filter(or_(*the_filter))
+        else:
+            query = query.filter(the_filter[0])
+
+    rows = query.order_by("name").all()
+
+    result = {}
+    for row in rows:
+        result[row['name']] = _dict_with_extra_specs(row)
+
+    return result
+
+
+def _group_type_get_id_from_group_type_query(context, id, session=None):
+    return model_query(
+        context, models.ShareGroupTypes, read_deleted="no", session=session).\
+        filter_by(id=id)
+
+
+def _group_type_get_id_from_group_type(context, id, session=None):
+    result = _group_type_get_id_from_group_type_query(
+        context, id, session=session).first()
+    if not result:
+        raise exception.GroupTypeNotFound(group_type_id=id)
+    return result['id']
+
+
+@require_context
+def _group_type_get(context, id, session=None, inactive=False,
+                    expected_fields=None):
+    expected_fields = expected_fields or []
+    read_deleted = "yes" if inactive else "no"
+    result = _group_type_get_query(
+        context, session, read_deleted, expected_fields). \
+        filter_by(id=id). \
+        first()
+
+    if not result:
+        raise exception.GroupTypeNotFound(group_type_id=id)
+
+    group_type = _dict_with_extra_specs(result)
+
+    if 'projects' in expected_fields:
+        group_type['projects'] = [p['project_id'] for p in result['projects']]
+
+    return group_type
+
+
+@require_context
+def group_type_get(context, id, inactive=False, expected_fields=None):
+    """Return a dict describing specific group_type."""
+    return _group_type_get(context, id,
+                           session=None,
+                           inactive=inactive,
+                           expected_fields=expected_fields)
+
+
+@require_context
+def _group_type_get_by_name(context, name, session=None):
+    result = model_query(context, models.ShareGroupTypes, session=session).\
+        options(joinedload('extra_specs')).\
+        options(joinedload('share_types')).\
+        filter_by(name=name).\
+        first()
+
+    if not result:
+        raise exception.GroupTypeNotFoundByName(group_type_name=name)
+
+    return _dict_with_extra_specs(result)
+
+
+@require_context
+def group_type_get_by_name(context, name):
+    """Return a dict describing specific group_type."""
+
+    return _group_type_get_by_name(context, name)
+
+
+@require_admin_context
+def group_type_destroy(context, id):
+    session = get_session()
+    with session.begin():
+        _group_type_get(context, id, session)
+        results = model_query(context, models.ShareGroup, session=session,
+                              read_deleted="no").\
+            filter_by(share_group_type_id=id).count()
+        if results:
+            LOG.error(_LE('Group type %s deletion failed, Group type in use.'),
+                      id)
+            raise exception.GroupTypeInUse(group_type_id=id)
+        model_query(context, models.ShareGroupTypeExtraSpecs,
+                    session=session).\
+            filter_by(share_group_type_id=id).soft_delete()
+        model_query(context, models.ShareGroupTypes, session=session).\
+            filter_by(id=id).soft_delete()
+
+
+def _group_type_access_query(context, session=None):
+    return model_query(context, models.ShareGroupTypeProjects, session=session,
+                       read_deleted="no")
+
+
+@require_admin_context
+def group_type_access_get_all(context, type_id):
+    group_type_id = _group_type_get_id_from_group_type(context, type_id)
+    return _group_type_access_query(context).\
+        filter_by(share_group_type_id=group_type_id).all()
+
+
+@require_admin_context
+def group_type_access_add(context, type_id, project_id):
+    """Add given tenant to the group_typ  access list."""
+    group_type_id = _group_type_get_id_from_group_type(context, type_id)
+
+    access_ref = models.ShareGroupTypeProjects()
+    access_ref.update({"share_group_type_id": group_type_id,
+                       "project_id": project_id})
+
+    session = get_session()
+    with session.begin():
+        try:
+            access_ref.save(session=session)
+        except db_exception.DBDuplicateEntry:
+            raise exception.GroupTypeAccessExists(group_type_id=type_id,
+                                                  project_id=project_id)
+        return access_ref
+
+
+@require_admin_context
+def group_type_access_remove(context, type_id, project_id):
+    """Remove given tenant from the group_typ  access list."""
+    group_type_id = _group_type_get_id_from_group_type(context, type_id)
+
+    count = _group_type_access_query(context).\
+        filter_by(share_group_type_id=group_type_id).\
+        filter_by(project_id=project_id).\
+        soft_delete(synchronize_session=False)
+    if count == 0:
+        raise exception.GroupTypeAccessNotFound(
+            group_type_id=type_id, project_id=project_id)
+
+
+def _group_type_extra_specs_query(context, group_type_id, session=None):
+    return model_query(context, models.ShareGroupTypeExtraSpecs,
+                       session=session, read_deleted="no").\
+        filter_by(share_group_type_id=group_type_id).\
+        options(joinedload('share_group_type'))
+
+
+@require_context
+def group_type_extra_specs_get(context, group_type_id):
+    rows = _group_type_extra_specs_query(context, group_type_id).\
+        all()
+
+    result = {}
+    for row in rows:
+        result[row['key']] = row['value']
+
+    return result
+
+
+@require_context
+def group_type_extra_specs_delete(context, group_type_id, key):
+    session = get_session()
+    with session.begin():
+        _group_type_extra_specs_get_item(context, group_type_id, key, session)
+        _group_type_extra_specs_query(context, group_type_id, session).\
+            filter_by(key=key).soft_delete()
+
+
+@require_context
+def _group_type_extra_specs_get_item(context, group_type_id, key,
+                                     session=None):
+    result = _group_type_extra_specs_query(
+        context, group_type_id, session=session
+    ).filter_by(key=key).options(joinedload('share_group_type')).first()
+
+    if not result:
+        raise exception.GroupTypeExtraSpecsNotFound(
+            extra_specs_key=key, group_type_id=group_type_id)
+
+    return result
+
+
+@require_context
+@oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
+def group_type_extra_specs_update_or_create(context, group_type_id, specs):
+    session = get_session()
+    with session.begin():
+        spec_ref = None
+        for key, value in specs.items():
+            try:
+                spec_ref = _group_type_extra_specs_get_item(
+                    context, group_type_id, key, session)
+            except exception.GroupTypeExtraSpecsNotFound:
+                spec_ref = models.ShareGroupTypeExtraSpecs()
+            spec_ref.update({"key": key, "value": value,
+                             "share_group_type_id": group_type_id,
+                             "deleted": 0})
+            spec_ref.save(session=session)
+
+        return specs

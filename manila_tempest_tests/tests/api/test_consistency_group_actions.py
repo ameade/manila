@@ -31,8 +31,7 @@ CGSNAPSHOT_DETAIL_REQUIRED_KEYS = {"id", "name", "description", "created_at",
                                    "status", "project_id", "links"}
 
 
-@testtools.skipUnless(CONF.share.run_consistency_group_tests,
-                      'Consistency Group tests disabled.')
+@testtools.skip('Consistency Group tests disabled.')
 class ConsistencyGroupActionsTest(base.BaseSharesTest):
     """Covers consistency group functionality."""
 
@@ -322,13 +321,13 @@ class ConsistencyGroupRenameTest(base.BaseSharesTest):
     @test.attr(type=[base.TAG_POSITIVE, base.TAG_API_WITH_BACKEND])
     def test_update_consistency_group_v2_4(self):
 
-        # Get consistency_group
+        # Get share_group
         consistency_group = self.shares_v2_client.get_consistency_group(
             self.consistency_group['id'], version='2.4')
         self.assertEqual(self.cg_name, consistency_group["name"])
         self.assertEqual(self.cg_desc, consistency_group["description"])
 
-        # Update consistency_group
+        # Update share_group
         new_name = data_utils.rand_name("tempest-new-name")
         new_desc = data_utils.rand_name("tempest-new-description")
         updated = self.shares_v2_client.update_consistency_group(
@@ -340,7 +339,7 @@ class ConsistencyGroupRenameTest(base.BaseSharesTest):
         self.assertEqual(new_name, updated["name"])
         self.assertEqual(new_desc, updated["description"])
 
-        # Get consistency_group
+        # Get share_group
         consistency_group = self.shares_v2_client.get_consistency_group(
             self.consistency_group['id'], version='2.4')
         self.assertEqual(new_name, consistency_group["name"])
@@ -350,7 +349,7 @@ class ConsistencyGroupRenameTest(base.BaseSharesTest):
     def test_create_update_read_consistency_group_with_unicode_v2_4(self):
         value1 = u'ಠ_ಠ'
         value2 = u'ಠ_ರೃ'
-        # Create consistency_group
+        # Create share_group
         consistency_group = self.create_consistency_group(
             cleanup_in_class=False,
             name=value1,
@@ -360,7 +359,7 @@ class ConsistencyGroupRenameTest(base.BaseSharesTest):
         self.assertEqual(value1, consistency_group["name"])
         self.assertEqual(value1, consistency_group["description"])
 
-        # Update consistency_group
+        # Update share_group
         updated = self.shares_v2_client.update_consistency_group(
             consistency_group["id"],
             name=value2,
@@ -370,7 +369,7 @@ class ConsistencyGroupRenameTest(base.BaseSharesTest):
         self.assertEqual(value2, updated["name"])
         self.assertEqual(value2, updated["description"])
 
-        # Get consistency_group
+        # Get share_group
         consistency_group = self.shares_v2_client.get_consistency_group(
             consistency_group['id'], version='2.4')
         self.assertEqual(value2, consistency_group["name"])

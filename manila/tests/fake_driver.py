@@ -104,8 +104,8 @@ class FakeShareDriver(driver.ShareDriver):
         return super(FakeShareDriver, self)._verify_share_server_handling(
             driver_handles_share_servers)
 
-    def create_consistency_group(self, context, cg_id):
+    def create_share_group(self, context, group_id):
         pass
 
-    def delete_consistency_group(self, context, cg_id):
+    def delete_share_group(self, context, group_id):
         pass

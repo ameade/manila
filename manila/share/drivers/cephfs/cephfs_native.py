@@ -89,7 +89,6 @@ class CephFSNativeDriver(driver.ShareDriver,):
         free_capacity_gb = stats['kb_avail'] * units.Mi
 
         data = {
-            'consistency_group_support': 'pool',
             'vendor_name': 'Ceph',
             'driver_version': '1.0',
             'share_backend_name': self.backend_name,

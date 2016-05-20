@@ -22,13 +22,13 @@ class ViewBuilder(common.ViewBuilder):
     _collection_name = 'shares'
     _detail_version_modifiers = [
         "add_snapshot_support_field",
-        "add_consistency_group_fields",
         "add_task_state_field",
         "modify_share_type_field",
         "remove_export_locations",
         "add_access_rules_status_field",
         "add_replication_fields",
         "add_user_id",
+        "add_share_group_fields",
     ]
 
     def summary_list(self, request, shares):
@@ -148,6 +148,13 @@ class ViewBuilder(common.ViewBuilder):
     @common.ViewBuilder.versioned_method("2.16")
     def add_user_id(self, context, share_dict, share):
         share_dict['user_id'] = share.get('user_id')
+
+    @common.ViewBuilder.versioned_method("2.21", "2.21", experimental=True)
+    def add_share_group_fields(self, context, share_dict, share):
+        share_dict['share_group_id'] = share.get(
+            'share_group_id')
+        share_dict['source_group_snapshot_member_id'] = share.get(
+            'source_group_snapshot_member_id')
 
     def _list_view(self, func, request, shares):
         """Provide a view for a list of shares."""

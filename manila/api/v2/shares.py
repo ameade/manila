@@ -35,16 +35,14 @@ class ShareController(shares.ShareMixin,
         super(self.__class__, self).__init__()
         self.share_api = share.API()
 
-    @wsgi.Controller.api_version("2.4")
+    @wsgi.Controller.api_version("2.21", "2.21", experimental=True)
     def create(self, req, body):
         return self._create(req, body)
 
-    @wsgi.Controller.api_version("2.0", "2.3")  # noqa
+    @wsgi.Controller.api_version("2.0")  # noqa
     def create(self, req, body):  # pylint: disable=E0102
-        # Remove consistency group attributes
-        body.get('share', {}).pop('consistency_group_id', None)
-        share = self._create(req, body)
-        return share
+        body.get('share', {}).pop('share_group_id', None)
+        return self._create(req, body)
 
     @wsgi.Controller.api_version('2.0', '2.6')
     @wsgi.action('os-reset_status')

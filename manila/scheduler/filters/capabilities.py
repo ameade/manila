@@ -80,6 +80,7 @@ class CapabilitiesFilter(base_host.BaseHostFilter):
         # this filter, so the resource type is either instance or
         # volume.
         resource_type = filter_properties.get('resource_type')
+
         if not self._satisfies_extra_specs(host_state.capabilities,
                                            resource_type):
             LOG.debug("%(host_state)s fails resource_type extra_specs "

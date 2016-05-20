@@ -822,7 +822,7 @@ class SharesV2Client(shares_client.SharesClient):
             post_body['source_cgsnapshot_id'] = source_cgsnapshot_id
         if share_network_id:
             post_body['share_network_id'] = share_network_id
-        body = json.dumps({'consistency_group': post_body})
+        body = json.dumps({'share_group': post_body})
         resp, body = self.post(uri, body, headers=EXPERIMENTAL,
                                extra_headers=True, version=version)
         self.expected_success(202, resp.status)
@@ -868,7 +868,7 @@ class SharesV2Client(shares_client.SharesClient):
             post_body['description'] = description
         if kwargs:
             post_body.update(kwargs)
-        body = json.dumps({'consistency_group': post_body})
+        body = json.dumps({'share_group': post_body})
         resp, body = self.put(uri, body, headers=EXPERIMENTAL,
                               extra_headers=True, version=version)
         self.expected_success(200, resp.status)
